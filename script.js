@@ -1,4 +1,4 @@
-const tone = "gentle"; 
+let tone = "gentle"; 
 
 const people = [
     "Melisa",
@@ -23,7 +23,7 @@ const niceOutcomes = [
     "a gift chosen with care and intention",
     "something that comes straight from the heart",
     "something perfect, just for them",
-    "a gift for someone I absolutely adore",
+    "a gift wrapped in 'I adore you' energy",
     "a gift wrapped in affection",
     "something that feels like a warm hug",
     "something for my favorite human (don't tell the others)",
@@ -93,22 +93,84 @@ const memeOutcomes = [
     "a reaction image origin story",
     "a situation that needs context",
     "a moment that starts with 'remember when'",
-    "something that will resurface unexpectedly",
+    "something that will resurface unexpectedly"
 ];
 
+const historyList = document.getElementById("history-list");
+const HISTORY_LIMIT = 5; 
+const history = [];
+
+function addToHistory(text) {
+    history.unshift(text);
+    if (history.length > HISTORY_LIMIT) history.pop();
+}
+
+function renderHistory() {
+    historyList.innerHTML = "";
+    for(const item of history) {
+        const li = document.createElement("li");
+        li.textContent = item;
+        historyList.appendChild(li);
+    }
+}
+
+const elfImage = document.getElementById("elf-image");
+
+function setElfMood(snarkThing) {
+    elfImage.classList.remove("mood-gentle", "mood-chaos", "mood-spicy");
+
+    elfImage.classList.add(tone === "chaos" ? "mood-chaos" : "mood-gentle");
+
+    const spicyTriggers = [
+        "exercise in patience",
+        "lump of coal",
+        "plot twist",
+        "character development"
+    ];
+
+    const lower = snarkThing.toLowerCase();
+    if(spicyTriggers.some(t => lower.includes(t))) {
+        elfImage.classList.remove("mood-spicy");
+        void elfImage.offsetWidth;
+        elfImage.classList.add("mood-spicy");
+
+        setTimeout(() => {
+            elfImage.classList.remove("mood-spicy");
+        }, 900);
+    }
+}
+
+const chaosToggle = document.getElementById("chaos-toggle");
+
+chaosToggle.addEventListener("change", () => {
+    tone = chaosToggle.checked ? "chaos" : "gentle";
+});
+
+const statRounds = document.getElementById("stat-rounds");
+const statDevelopment = document.getElementById("stat-development");
+const statCoal = document.getElementById("stat-coal");
+const statMemes = document.getElementById("stat-memes");
+
+const stats = {
+    rounds: 0,
+    development: 0,
+    coal: 0,
+    memes: 0
+};
+
+function renderStats() {
+    statRounds.textContent = stats.rounds;
+    statDevelopment.textContent = stats.development;
+    statCoal.textContent = stats.coal;
+    statMemes.textContent = stats.memes; 
+}
 
 const playerSelect = document.getElementById("player-select");
 const generateBtn = document.getElementById("btn-message"); 
 const messageOutput = document.getElementById("message-output");
 
 function applyName(template, name) {
-    return template.replace("${name}", name);
-}
-
-function maybeAddMeme() {
-    return Math.random() < 0.3
-    ? ` This will result in ${getRandomItem(memeOutcomes)}.`
-    : "";
+    return template.replaceAll("${name}", name);
 }
 
 function getOtherPeople(player) {
@@ -118,6 +180,12 @@ function getOtherPeople(player) {
 function getRandomItem(array) {
     const randomIndex = Math.floor(Math.random() * array.length);
     return array[randomIndex];
+}
+function maybeAddMeme() {
+  const used = Math.random() < 0.3;
+  return used
+    ? { text: ` This will result in ${getRandomItem(memeOutcomes)}.`, used: true }
+    : { text: "", used: false };
 }
 
 function generateSeasonMessage(player) {
@@ -130,12 +198,17 @@ function generateSeasonMessage(player) {
 
   const niceThing = getRandomItem(niceOutcomes);
   const snarkThing = getSnarkOutcome(snarkPerson);
+
   const meme = maybeAddMeme();
 
-  return `This year, ${nicePerson} is getting ${niceThing}.
-  
-Meanwhile, ${snarkPerson} is receiving… ${snarkThing}.${meme}`;
+  const text = `This year, ${nicePerson} is getting ${niceThing}.
+
+Meanwhile, ${snarkPerson} is receiving… ${snarkThing}.${meme.text}`;
+
+  return { text, snarkThing, memeUsed: meme.used };
 }
+
+
 
 function getSnarkOutcome(name) {
     const pool = tone === "chaos" ? chaosSnarkOutcomes : snarkOutcomes;
@@ -153,12 +226,58 @@ generateBtn.addEventListener("click", () => {
         messageOutput.textContent = "Please select who you are first 🙂";
         return; 
     }
-    
-    messageOutput.style.opacity = 0;
 
+   // Copy button - SEPARATE listener
+const copyBtn = document.getElementById("copy-btn");
+
+copyBtn.addEventListener("click", () => {
+  const text = messageOutput.textContent;
+
+  if (!text || text === "Please select who you are first 🙂") {
+    return;
+  }
+
+  navigator.clipboard.writeText(text).then(() => {
+    copyBtn.textContent = "✅ Copied!";
     setTimeout(() => {
-        messageOutput.textContent = generateSeasonMessage(player);
-        messageOutput.style.opacity = 1;
-}, 100);
+      copyBtn.textContent = "📋 Copy";
+    }, 1500);
+  });
 });
 
+// DO IT button - SEPARATE listener
+generateBtn.addEventListener("click", () => {
+  const player = playerSelect.value;
+
+  if (!player) {
+    messageOutput.textContent = "Please select who you are first 🙂";
+    return;
+  }
+
+  const result = generateSeasonMessage(player);
+  setElfMood(result.snarkThing);
+  const msg = result.text;
+
+  stats.rounds += 1;
+
+  const lowerSnark = result.snarkThing.toLowerCase();
+  if (lowerSnark.includes("character development")) stats.development += 1;
+  if (lowerSnark.includes("lump of coal") || lowerSnark.includes("coal")) stats.coal += 1;
+  if (result.memeUsed) stats.memes += 1;
+
+  renderStats();
+
+  messageOutput.style.opacity = 0;
+
+  setTimeout(() => {
+    messageOutput.textContent = msg;
+    messageOutput.style.opacity = 1;
+
+    addToHistory(msg);
+    renderHistory();
+
+    playerSelect.value = "";
+    playerSelect.focus();
+  }, 100);
+});
+})
